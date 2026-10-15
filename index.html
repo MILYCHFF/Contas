@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contas Mensais</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#fff;--card:#f7f6f3;--tx:#37352f;--mu:#787774;--bd:#e5e3de;--ac:#2383e2;--ok:#0f9d6b;--bad:#e03e3e;--warn:#d9730d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#191919;--card:#252525;--tx:#e6e6e4;--mu:#9b9a97;--bd:#373737;--ac:#4a9eff;--ok:#2fc896;--bad:#ff6b6b;--warn:#f0a050;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#191919;--card:#252525;--tx:#e6e6e4;--mu:#9b9a97;--bd:#373737;--ac:#4a9eff;--ok:#2fc896;--bad:#ff6b6b;--warn:#f0a050;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif;padding:16px;max-width:1000px;margin-inline:auto}
+h1{font-size:20px;margin:0}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.nav{display:flex;gap:6px;align-items:center}
+button,input,select{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:7px 10px}
+button{cursor:pointer}button:hover{background:var(--card)}
+button.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+#mes{min-width:130px;text-align:center;font-weight:600;text-transform:capitalize}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin-bottom:14px}
+.k{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+.k small{color:var(--mu);display:block}.k b{font-size:18px}
+.bar{height:8px;background:var(--bd);border-radius:4px;margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:14px}
+.box{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.box h2{font-size:13px;margin:0 0 8px;color:var(--mu);font-weight:600}
+.cv{position:relative;height:220px}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px}
+form input,form select{width:100%}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:520px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd)}
+th{color:var(--mu);font-weight:600;font-size:12px}
+td.v{text-align:right;white-space:nowrap}
+.tag{font-size:11px;padding:2px 7px;border-radius:10px;border:1px solid var(--bd);color:var(--mu)}
+.pago td:not(.a){text-decoration:line-through;color:var(--mu)}
+.late{color:var(--bad);font-weight:600}
+.x{border:none;background:none;color:var(--mu)}
+.empty{text-align:center;color:var(--mu);padding:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>💰 Contas Mensais</h1>
+  <div class="nav">
+    <button id="prev">‹</button><span id="mes"></span><button id="next">›</button>
+    <button id="exp" title="Exportar backup">⬇</button><button id="imp" title="Importar backup">⬆</button>
+  </div>
+</header>
+
+<div class="kpis">
+  <div class="k"><small>Receitas</small><b id="kRec" style="color:var(--ok)"></b></div>
+  <div class="k"><small>Total de contas</small><b id="kTot"></b></div>
+  <div class="k"><small>Pago</small><b id="kPago"></b></div>
+  <div class="k"><small>A pagar</small><b id="kPend" style="color:var(--warn)"></b></div>
+  <div class="k"><small>Vencidas</small><b id="kVenc" style="color:var(--bad)"></b></div>
+  <div class="k"><small>Saldo previsto</small><b id="kSaldo"></b></div>
+  <div class="k"><small>Progresso <span id="kPct"></span></small><div class="bar"><i id="bar"></i></div></div>
+</div>
+
+<div class="grid">
+  <div class="box"><h2>Gastos por categoria</h2><div class="cv"><canvas id="c1"></canvas></div></div>
+  <div class="box"><h2>Últimos 6 meses</h2><div class="cv"><canvas id="c2"></canvas></div></div>
+</div>
+
+<form id="f">
+  <input id="d" placeholder="Descrição" required>
+  <select id="t"><option value="c">Conta</option><option value="r">Receita</option></select>
+  <select id="cat"><option>Moradia</option><option>Alimentação</option><option>Transporte</option><option>Saúde</option><option>Lazer</option><option>Educação</option><option>Assinaturas</option><option>Cartão</option><option>Outros</option></select>
+  <input id="v" type="number" step="0.01" min="0" placeholder="Valor (R$)" required>
+  <input id="dt" type="date" required>
+  <input id="rep" type="number" min="1" max="24" value="1" title="Repetir por N meses">
+  <button class="pri">Adicionar</button>
+</form>
+
+<div class="box tw">
+<table>
+  <thead><tr><th></th><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th style="text-align:right">Valor</th><th></th></tr></thead>
+  <tbody id="tb"></tbody>
+</table>
+</div>
+
+<input type="file" id="file" accept=".json" hidden>
+
+<script>
+const $=id=>document.getElementById(id);
+const brl=n=>n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const KEY='contas-mensais-v1';
+let items=[];
+try{items=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}};
+let cur=new Date();cur=new Date(cur.getFullYear(),cur.getMonth(),1);
+const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const today=new Date().toISOString().slice(0,10);
+const pal=['#2383e2','#0f9d6b','#d9730d','#e03e3e','#9065b0','#dfab01','#e255a1','#64473a','#787774'];
+let ch1,ch2;
+
+function sumMonth(key,fn){return items.filter(i=>i.dt.slice(0,7)===key&&fn(i)).reduce((s,i)=>s+i.v,0)}
+
+function render(){
+  const key=ym(cur);
+  $('mes').textContent=cur.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  const m=items.filter(i=>i.dt.slice(0,7)===key).sort((a,b)=>a.dt.localeCompare(b.dt));
+  const rec=m.filter(i=>i.t==='r').reduce((s,i)=>s+i.v,0);
+  const cs=m.filter(i=>i.t==='c');
+  const tot=cs.reduce((s,i)=>s+i.v,0);
+  const pago=cs.filter(i=>i.paid).reduce((s,i)=>s+i.v,0);
+  const venc=cs.filter(i=>!i.paid&&i.dt<today).reduce((s,i)=>s+i.v,0);
+  const pct=tot?Math.round(pago/tot*100):0;
+  $('kRec').textContent=brl(rec);$('kTot').textContent=brl(tot);$('kPago').textContent=brl(pago);
+  $('kPend').textContent=brl(tot-pago);$('kVenc').textContent=brl(venc);
+  const saldo=rec-tot;$('kSaldo').textContent=brl(saldo);$('kSaldo').style.color=saldo<0?'var(--bad)':'var(--ok)';
+  $('kPct').textContent=pct+'%';$('bar').style.width=pct+'%';
+
+  $('tb').innerHTML=m.length?m.map(i=>`<tr class="${i.paid?'pago':''}">
+    <td class="a"><input type="checkbox" ${i.paid?'checked':''} onchange="tg('${i.id}')" title="${i.t==='r'?'Recebido':'Pago'}"></td>
+    <td>${esc(i.d)}</td><td><span class="tag">${i.t==='r'?'Receita':esc(i.cat)}</span></td>
+    <td class="${!i.paid&&i.t==='c'&&i.dt<today?'late':''}">${i.dt.split('-').reverse().join('/')}</td>
+    <td class="v" style="color:${i.t==='r'?'var(--ok)':'inherit'}">${i.t==='r'?'+':''}${brl(i.v)}</td>
+    <td class="a"><button class="x" onclick="rm('${i.id}')">✕</button></td></tr>`).join('')
+    :'<tr><td colspan="6" class="empty">Nenhum lançamento neste mês.</td></tr>';
+
+  const css=getComputedStyle(document.documentElement);
+  const tx=css.getPropertyValue('--mu').trim(),gr=css.getPropertyValue('--bd').trim();
+  Chart.defaults.color=tx;
+  const byCat={};cs.forEach(i=>byCat[i.cat]=(byCat[i.cat]||0)+i.v);
+  const labs=Object.keys(byCat);
+  if(ch1)ch1.destroy();
+  ch1=new Chart($('c1'),{type:'doughnut',data:{labels:labs.length?labs:['Sem dados'],datasets:[{data:labs.length?labs.map(l=>byCat[l]):[1],backgroundColor:labs.length?pal:[gr],borderWidth:0}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:10}},tooltip:{enabled:!!labs.length,callbacks:{label:c=>' '+brl(c.parsed)}}}}});
+  const ms=[],lb=[];
+  for(let k=5;k>=0;k--){const d=new Date(cur.getFullYear(),cur.getMonth()-k,1);ms.push(ym(d));lb.push(d.toLocaleDateString('pt-BR',{month:'short'}))}
+  if(ch2)ch2.destroy();
+  ch2=new Chart($('c2'),{type:'bar',data:{labels:lb,datasets:[
+    {label:'Receitas',data:ms.map(k=>sumMonth(k,i=>i.t==='r')),backgroundColor:'#0f9d6b',borderRadius:4},
+    {label:'Contas',data:ms.map(k=>sumMonth(k,i=>i.t==='c')),backgroundColor:'#e03e3e',borderRadius:4}]},
+    options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,grid:{color:gr}},x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}},tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+brl(c.parsed.y)}}}}});
+}
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+window.tg=id=>{const i=items.find(x=>x.id===id);if(i){i.paid=!i.paid;save();render()}};
+window.rm=id=>{items=items.filter(x=>x.id!==id);save();render()};
+
+$('f').onsubmit=e=>{
+  e.preventDefault();
+  const n=Math.max(1,parseInt($('rep').value)||1),[y,mo,da]=$('dt').value.split('-').map(Number);
+  for(let k=0;k<n;k++){
+    const last=new Date(y,mo-1+k+1,0).getDate();
+    const d=new Date(y,mo-1+k,Math.min(da,last));
+    const dt=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    items.push({id:Date.now().toString(36)+k+Math.random().toString(36).slice(2,5),d:$('d').value.trim()+(n>1?` (${k+1}/${n})`:''),t:$('t').value,cat:$('cat').value,v:parseFloat($('v').value),dt,paid:false});
+  }
+  save();$('d').value='';$('v').value='';$('rep').value=1;render();
+};
+$('prev').onclick=()=>{cur=new Date(cur.getFullYear(),cur.getMonth()-1,1);render()};
+$('next').onclick=()=>{cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);render()};
+$('dt').value=today;
+$('exp').onclick=()=>{const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(items));a.download='contas.json';a.click()};
+$('imp').onclick=()=>$('file').click();
+$('file').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(Array.isArray(j)){items=j;save();render()}}catch(x){alert('Arquivo inválido')}};r.readAsText(e.target.files[0])};
+render();
+</script>
+</body>
+</html>
